@@ -86,24 +86,24 @@ ui <- shinyUI(
                   href='mailto:preetam.balijepalli@gmail.com'>Preetam Balijepalli</a>
                   </big></strong>&nbsp;&nbsp;&nbsp;&nbsp;
                   <br/>&spades;&nbsp;&nbsp;<a title='Know my blog' target='_blank' href='http://balijepalli.com/about/'>About me</a>&nbsp;&nbsp;&spades;</div>") )
-
-
-  )
-)
+    
+    
+    )
+    )
 
 server <- shinyServer(function(input, output,session) {
-
+  
   output$text <- renderText({
     paste("Input text is:", input$text)
   })
-
+  
   observe({
     iniTime <- Sys.time()
-
+    
     textCleansed <- cleanPhrases(input$text)
     if(textCleansed != " ")
     {
-    
+      
       output$cleaned <- renderText({
         paste0("Cleansed text: [",textCleansed,"]")
       })
@@ -121,8 +121,8 @@ server <- shinyServer(function(input, output,session) {
       })
       gc()
     }
-
-})
+    
+  })
   
   
 })  

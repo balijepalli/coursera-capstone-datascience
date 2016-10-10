@@ -1,0 +1,226 @@
+---
+title: "Capstone Exploratory Data Analysis and Modeling Report"
+author: "Preetam Balijepalli"
+date: "September 5, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Synopsis
+
+The Capstone Project objective is to build a predictive text model from database. Where ,
+
+The goal of this project is just to display that we have gotten used to working with the data and that we are on track to create your prediction algorithm. Need to:
+
+1. Demonstrate that we have downloaded the data and have successfully loaded it in.
+2. Create a basic report of summary statistics about the data sets.
+3. Report any interesting findings that we have amassed so far.
+4. Get feedback on the plans for creating a prediction algorithm and Shiny app.
+
+
+The text documents are provided from different three web sources: blogs, twitter and news articles. This report demonstrates the preliminary exploration of the data and the possible ways to build the prediction algorithm.
+
+
+# Analysis Methodology
+The exploratory data analysis methodology included the following tasks. All code supporting the tasks are embedded in the Markdown document.
+
+Approach
+  - Import data file/s.
+  - Calculate file size statistics for each.
+  - Build samples from each file (10,000 records).
+  - Consolidate the individuals samples into a master sample dataset.
+  - Build the corpus object using distinct sentences.
+  - Tokenize the corpus.
+  - Create word frequency matrices for unigrams, bigrams and trigrams.
+  - Graph word frequencies for unigrams, bigrams and trigrams.
+
+# Results
+
+Results from the analysis are grouped into two categories: 
+1) Basic statistics of each file and 2) Unigram, Bigram   and Trigram word frequencies.
+
+
+# Exploratory Analisys
+
+## Libraries
+
+Libraries used in this study.
+
+```{r}
+library(tm,quietly = TRUE, warn.conflicts = FALSE)
+library(NLP,quietly = TRUE, warn.conflicts = FALSE)
+library(RWeka,quietly = TRUE, warn.conflicts = FALSE)
+library(stringi,quietly = TRUE, warn.conflicts = FALSE)
+library(ggplot2,quietly = TRUE, warn.conflicts = FALSE)
+library(dplyr,quietly = TRUE, warn.conflicts = FALSE)
+library(SnowballC,quietly = TRUE, warn.conflicts = FALSE)
+library(wordcloud,quietly = TRUE, warn.conflicts = FALSE)
+library(fpc,quietly = TRUE, warn.conflicts = FALSE)
+library(qdap,quietly = TRUE, warn.conflicts = FALSE)
+
+```
+
+
+##Load Data
+
+Once loading library is, we can go ahead and read in the text files.
+
+```{r}
+blogs <- readLines("D:/Coursera-SwiftKey/final/en_US/en_US.blogs.txt", encoding = "UTF-8", skipNul = TRUE)
+
+news <- readLines("D:/Coursera-SwiftKey/final/en_US/en_US.news.txt", encoding = "UTF-8", skipNul = TRUE)
+
+twitter <- readLines("D:/Coursera-SwiftKey/final/en_US/en_US.twitter.txt", encoding = "UTF-8", skipNul = TRUE)
+
+```
+
+Verify the number of rows and Characters
+
+```{r}
+#Number of rows
+numrows.blogs <- NROW(blogs)
+numrows.news <- NROW(news)
+numrows.twitter <- NROW(twitter)
+```
+
+```{r}
+#Number of characters
+numchars.blogs <- sum(nchar(blogs))
+numchars.news <- sum(nchar(news))
+numchars.twitter <- sum(nchar(twitter))
+```
+
+
+## Creating Corpus
+Since the data is huge loading some sample data to create corpus
+
+```{r}
+#Number of rows
+thousandrows.blogs <- readLines("D:/Coursera-SwiftKey/final/en_US/en_US.blogs.txt", 1000,encoding = "latin1",warn = FALSE)
+thousandrows.news <- readLines("D:/Coursera-SwiftKey/final/en_US/en_US.news.txt", 1000,encoding = "latin1", warn = FALSE)
+thousandrows.twitter <- readLines("D:/Coursera-SwiftKey/final/en_US/en_US.twitter.txt", 1000,encoding = "latin1", warn = FALSE)
+
+#Validating the number of rows loaded
+count.thousandrows.blogs <- NROW(thousandrows.blogs)
+count.thousandrows.news <- NROW(thousandrows.news)
+count.thousandrows.twitter <- NROW(thousandrows.twitter)
+
+#Validating the number of characters
+count.thousandchars.blogs <- sum(nchar(thousandrows.blogs))
+count.thousandchars.news <- sum(nchar(thousandrows.news))
+count.thousandchars.twitter <- sum(nchar(thousandrows.twitter))
+
+
+#Corpus is really just a character vector with some extra attributes. So it's best to convert it to character than you can save that to a data.frame
+
+allfilestmp <- c(thousandrows.blogs,thousandrows.news,thousandrows.twitter)
+allfiles <- paste(allfilestmp, collapse = " ")
+
+## Create corpus object
+require(tm)
+vector.source <- VectorSource(allfiles)
+corpus <- Corpus(x=vector.source)
+
+# Clean corupus
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, stripWhitespace)
+corpus <- tm_map(corpus, tolower)
+corpus <- tm_map(corpus, stemDocument)
+corpus <- tm_map(corpus, removeWords, stopwords("english")) 
+corpus <- tm_map(corpus, PlainTextDocument)
+
+#Validating the Corpus (with sample data before pre-processing)
+inspect(corpus)
+
+```
+
+##Tokenize and Calculate Frequencies of N-Grams
+
+Using RWeka package to construct functions that tokenize the sample and construct matrices of uniqrams, bigrams, and trigrams.
+
+```{r}
+unigram.tokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
+bigram.tokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+trigram.tokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+
+require(SnowballC)
+unigram.matrix <- TermDocumentMatrix(corpus, control = list(tokenize = unigram.tokenizer))
+bigram.matrix <- TermDocumentMatrix(corpus, control = list(tokenize = bigram.tokenizer))
+trigram.matrix <- TermDocumentMatrix(corpus, control = list(tokenize = trigram.tokenizer))
+
+
+```
+
+Then we find the frequency of terms in each of these 3 matrices and construct dataframes of these frequencies. 
+
+```{r}
+
+###Calculate frequency of n-grams
+unigram.corpus <- findFreqTerms(unigram.matrix,lowfreq = 50)
+bigram.corpus  <- findFreqTerms(bigram.matrix,lowfreq=50)
+trigram.corpus <- findFreqTerms(trigram.matrix,lowfreq=50)
+
+unigram.corpus.frequency <- rowSums(as.matrix(unigram.matrix[unigram.corpus,]))
+bigram.corpus.frequency <- rowSums(as.matrix(bigram.matrix[bigram.corpus,]))
+trigram.corpus.frequency <- rowSums(as.matrix(trigram.matrix[trigram.corpus,]))
+
+unigram.corpus.frequency <- data.frame(word=names(unigram.corpus.frequency), frequency=unigram.corpus.frequency)
+bigram.corpus.frequency <- data.frame(word=names(bigram.corpus.frequency), frequency=bigram.corpus.frequency)
+trigram.corpus.frequency <- data.frame(word=names(trigram.corpus.frequency), frequency=trigram.corpus.frequency)
+
+```
+
+## Including Plots
+
+Lastly, we write a function to plot the n-gram frequency and go ahead and plot the 20 most frequent Unigrams, Bigrams, and Trigrams.
+
+###Unigram Word Frequency
+
+```{r}
+plot_n_grams <- function(data, title, num) {
+  df2 <- data[order(-data$frequency),][1:num,] 
+  ggplot(df2, aes(x = seq(1:num), y = frequency)) +
+    geom_bar(stat = "identity", fill = "red", colour = "black", width = 0.80) +
+    coord_cartesian(xlim = c(0, num+1)) +
+    labs(title = title) +
+    xlab("Words") +
+    ylab("Count") +
+    scale_x_discrete(breaks = seq(1, num, by = 1), labels = df2$word[1:num]) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+}
+
+plot_n_grams(unigram.corpus.frequency,"Top Unigrams",20)
+
+```
+
+
+```{r}
+require(quanteda)
+
+unigram.corpus <- corpus(thousandrows.blogs)
+bigram.corpus <- corpus(thousandrows.news)
+trigram.corpus <- corpus(thousandrows.twitter)
+
+
+corpus_sum <- unigram.corpus + bigram.corpus + trigram.corpus
+
+
+document.frequency.matrix <- dfm(corpus_sum, verbose = TRUE, toLower = TRUE, removeTwitter = TRUE, 
+             removeNumbers = TRUE, ignoredFeatures = stopwords("english"))
+
+barplot(topfeatures(document.frequency.matrix, 10), main="Top 10 Words in Corpus", col="orange", ylab="Frequency")
+```
+
+```{r}
+wordcloud(names(document.frequency.matrix), document.frequency.matrix, min.freq=50, scale=c(5, .1), colors=brewer.pal(6, "Dark2"))
+
+```
+
+
+## Conclusion
+
+Initial exploratory analysis is done next steps will be to build a predictive algorithm that uses an n-gram model with a frequency look up similar to the analysis above. This algorithm will then be deployed in a Shiny app and will suggest the most likely next word after a phrase is typed.
